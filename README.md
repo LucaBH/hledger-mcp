@@ -118,7 +118,7 @@ Replace `/path/to/your/master.journal` with the actual path to your HLedger jour
 You can toggle write behaviour with optional flags:
 
 - `--read-only` &mdash; disables the add-transaction tool entirely; all write attempts return an error.
-- `--skip-backup` &mdash; prevents the server from creating `.bak` files before appending to an existing journal.
+- `--skip-backup` &mdash; prevents backups for write tools that use a copy-and-replace workflow. The add-transaction tool does not create backups.
 
 Flags may appear before or after the journal path. Both options default to `false`. I recommend starting with `--read-only` enabled until you get more comfortable with the tool. Below is that sample config:
 
@@ -143,7 +143,7 @@ Flags may appear before or after the journal path. Both options default to `fals
 MCP clients that prefer configuration via environment variables can set:
 
 - `HLEDGER_READ_ONLY` &mdash; set to `true` to force read-only mode.
-- `HLEDGER_SKIP_BACKUP` &mdash; set to `true` to disable automatic `.bak` backups.
+- `HLEDGER_SKIP_BACKUP` &mdash; set to `true` to disable automatic `.bak` backups for tools that use a copy-and-replace workflow.
 - `HLEDGER_EXECUTABLE_PATH` &mdash; (Optional) absolute path to a specific `hledger` binary if it isn't on PATH; overrides auto-detection.
 - `HLEDGER_WEB_EXECUTABLE_PATH` &mdash; (Optional) absolute path to a standalone `hledger web` binary (for example `hledger-web`). When set, the MCP uses this executable instead of running `hledger web` via the primary binary.
 
@@ -180,7 +180,7 @@ The server communicates via stdio and expects the journal file path as the first
 
 When the server is not in `--read-only` mode, these tools can modify the primary journal:
 
-- `hledger_add_transaction` accepts structured postings and appends a new transaction after validating with `hledger check`. Enable `dryRun` to preview the entry without writing.
+- `hledger_add_transaction` accepts structured postings and validates a temporary candidate with `hledger check`. A confirmed add appends one complete transaction record, syncs it, and does not create a backup or replace the journal. Enable `dryRun` to preview the entry without writing.
 - `hledger_remove_entry` deletes a transaction by exact text and location, re-validating with `hledger check` and respecting optional backups.
 - `hledger_replace_entry` swaps an existing entry for new content, keeping spacing tidy and performing a validation pass before committing.
 - `hledger_import` wraps `hledger import`, running the command against a temporary copy of the journal. Provide one or more `dataFiles` (journal, csv, etc.) and an optional `rulesFile`; set `dryRun` to inspect the diff before committing. Successful imports create timestamped `.bak` files unless `--skip-backup` is active.
@@ -188,6 +188,16 @@ When the server is not in `--read-only` mode, these tools can modify the primary
 - `hledger_close` produces closing/opening assertions, retain-earnings, or clopen transactions via `hledger close`. Preview the generated entries with `dryRun`, then append them atomically (with optional backups) once you’re satisfied.
 
 All write tools include a `dryRun` parameter to "try it out" before writing.
+
+#### Add-transaction recovery
+
+The add-transaction tool reports `AmbiguousFinalWriteError` when the final append can have completed but the tool cannot confirm the outcome.
+Do not retry this result automatically.
+Inspect the journal with an operator-controlled recovery procedure.
+Reconcile the requested transaction before you submit another add request.
+
+The append path requires a filesystem that honors operating-system append mode, performs one complete-record write, and supports sync.
+It does not protect against a separate writer that replaces the journal file.
 
 ### Web tools
 

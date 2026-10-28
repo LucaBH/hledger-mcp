@@ -4,11 +4,30 @@ import path from "node:path";
 import { HLedgerExecutor } from "./executor.js";
 import type { CommandResult } from "./types.js";
 
-interface AppendTransactionParams {
+export interface FinalWriteHandle {
+  write(
+    buffer: Uint8Array,
+    offset: number,
+    length: number,
+    position: number | null,
+  ): Promise<{ bytesWritten: number }>;
+  sync(): Promise<void>;
+  close(): Promise<void>;
+}
+
+export interface FinalWriteFileSystem {
+  open(path: string, flags: string): Promise<FinalWriteHandle>;
+}
+
+export interface AppendTransactionParams {
   journalPath: string;
   transaction: string;
   dryRun?: boolean;
   skipBackup?: boolean;
+}
+
+export interface AppendOnlyTransactionParams extends AppendTransactionParams {
+  finalWriteFileSystem?: FinalWriteFileSystem;
 }
 
 export interface AppendTransactionResult {
@@ -29,6 +48,13 @@ export interface JournalWorkspace {
 
 export interface FinalizeWorkspaceOptions {
   skipBackup?: boolean;
+}
+
+export class AmbiguousFinalWriteError extends Error {
+  constructor() {
+    super("The final journal write may have completed. Do not retry automatically.");
+    this.name = "AmbiguousFinalWriteError";
+  }
 }
 
 async function fileExists(filePath: string): Promise<boolean> {
@@ -57,8 +83,8 @@ async function createWorkingCopy(
   }
 }
 
-async function determineSeparator(tempPath: string): Promise<string> {
-  const handle = await fs.open(tempPath, "r");
+async function determineSeparator(journalPath: string): Promise<string> {
+  const handle = await fs.open(journalPath, "r");
   try {
     const stats = await handle.stat();
     if (stats.size === 0) {
@@ -71,6 +97,40 @@ async function determineSeparator(tempPath: string): Promise<string> {
     return lastChar === "\n" ? "\n" : "\n\n";
   } finally {
     await handle.close();
+  }
+}
+
+async function appendFinalEntry(
+  journalPath: string,
+  entry: string,
+  fileSystem: FinalWriteFileSystem,
+): Promise<void> {
+  const buffer = Buffer.from(entry, "utf8");
+  let handle: FinalWriteHandle | undefined;
+
+  try {
+    handle = await fileSystem.open(journalPath, "a");
+    const { bytesWritten } = await handle.write(buffer, 0, buffer.length, null);
+
+    if (bytesWritten !== buffer.length) {
+      throw new AmbiguousFinalWriteError();
+    }
+
+    await handle.sync();
+  } catch (error) {
+    if (error instanceof AmbiguousFinalWriteError) {
+      throw error;
+    }
+
+    throw new AmbiguousFinalWriteError();
+  } finally {
+    if (handle) {
+      try {
+        await handle.close();
+      } catch {
+        // A completed sync fixes the write outcome. A failed sync is already ambiguous.
+      }
+    }
   }
 }
 
@@ -161,6 +221,59 @@ export async function appendTransactionSafely({
     applied: true,
     journalPath,
     backupPath,
+    transaction: normalizedTransaction,
+    checkResult,
+  };
+}
+
+export async function appendTransactionWithAppendOnlyFinalWrite({
+  journalPath,
+  transaction,
+  dryRun = false,
+  finalWriteFileSystem = fs,
+}: AppendOnlyTransactionParams): Promise<AppendTransactionResult> {
+  const normalizedTransaction = transaction.trimEnd();
+  const workspace = await createJournalWorkspace(journalPath);
+
+  let separator = "";
+  if (workspace.journalExists) {
+    separator = await determineSeparator(workspace.tempPath);
+  }
+
+  const entry = `${separator}${normalizedTransaction}\n`;
+  await fs.appendFile(workspace.tempPath, entry, "utf8");
+
+  let checkResult: CommandResult;
+  try {
+    checkResult = await HLedgerExecutor.execute("check", [
+      "--file",
+      workspace.tempPath,
+    ]);
+  } catch (error) {
+    await cleanupJournalWorkspace(workspace);
+    throw error;
+  }
+
+  if (dryRun) {
+    await cleanupJournalWorkspace(workspace);
+    return {
+      applied: false,
+      journalPath,
+      transaction: normalizedTransaction,
+      checkResult,
+    };
+  }
+
+  const finalSeparator = (await fileExists(journalPath))
+    ? await determineSeparator(journalPath)
+    : "";
+  await cleanupJournalWorkspace(workspace);
+  const finalEntry = `${finalSeparator}${normalizedTransaction}\n`;
+  await appendFinalEntry(journalPath, finalEntry, finalWriteFileSystem);
+
+  return {
+    applied: true,
+    journalPath,
     transaction: normalizedTransaction,
     checkResult,
   };

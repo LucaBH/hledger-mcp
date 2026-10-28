@@ -37,6 +37,7 @@ describe("AddTransactionTool", () => {
   });
 
   it("appends a transaction to the journal", async () => {
+    const originalStat = await fs.stat(journalPath);
     const tool = new AddTransactionTool();
     const result = await tool.execute({
       file: journalPath,
@@ -57,8 +58,11 @@ describe("AddTransactionTool", () => {
 
     const files = await fs.readdir(tempDir);
     expect(files.some((file) => file.startsWith("master.journal.bak-"))).toBe(
-      true,
+      false,
     );
+
+    const updatedStat = await fs.stat(journalPath);
+    expect(updatedStat.ino).toBe(originalStat.ino);
   });
 
   it("supports dry run without modifying the journal", async () => {

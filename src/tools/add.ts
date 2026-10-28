@@ -2,7 +2,7 @@ import { z } from "zod";
 import path from "node:path";
 import type { ToolMetadata } from "../base-tool.js";
 import { BaseTool } from "../base-tool.js";
-import { appendTransactionSafely } from "../journal-writer.js";
+import { appendTransactionWithAppendOnlyFinalWrite } from "../journal-writer.js";
 import { DateSchema, FilePathSchema, ValidationError } from "../types.js";
 
 const PostingSchema = z.object({
@@ -75,7 +75,7 @@ export class AddTransactionTool extends BaseTool<
     }
 
     const transactionText = this.buildTransaction(input);
-    const result = await appendTransactionSafely({
+    const result = await appendTransactionWithAppendOnlyFinalWrite({
       journalPath: path.resolve(targetFile),
       transaction: transactionText,
       dryRun: input.dryRun ?? false,
