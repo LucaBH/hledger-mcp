@@ -13,6 +13,7 @@ import { IncomeStatementTool } from "./tools/incomestatement.js";
 import { CashFlowTool } from "./tools/cashflow.js";
 import { PayeesTool } from "./tools/payees.js";
 import { DescriptionsTool } from "./tools/descriptions.js";
+import { CommoditiesTool } from "./tools/commodities.js";
 import { TagsTool } from "./tools/tags.js";
 import { FilesTool } from "./tools/files.js";
 import { StatsTool } from "./tools/stats.js";
@@ -91,6 +92,7 @@ const incomeStatementTool = new IncomeStatementTool(journalFilePath);
 const cashFlowTool = new CashFlowTool(journalFilePath);
 const payeesTool = new PayeesTool(journalFilePath);
 const descriptionsTool = new DescriptionsTool(journalFilePath);
+const commoditiesTool = new CommoditiesTool(journalFilePath);
 const tagsTool = new TagsTool(journalFilePath);
 const filesTool = new FilesTool(journalFilePath);
 const statsTool = new StatsTool(journalFilePath);
@@ -246,6 +248,18 @@ server.tool(
   descriptionsTool.metadata.schema.shape,
   async (args) => {
     const result = await descriptionsTool.execute(args);
+    return {
+      content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+    };
+  },
+);
+
+server.tool(
+  commoditiesTool.metadata.name,
+  commoditiesTool.metadata.description,
+  commoditiesTool.metadata.schema.shape,
+  async (args) => {
+    const result = await commoditiesTool.execute(args);
     return {
       content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
     };

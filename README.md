@@ -35,6 +35,7 @@ The HLedger MCP server provides comprehensive access to HLedger's financial repo
 - **Activity** - Account activity and transaction frequency analysis
 - **Payees** - List and analyze transaction payees
 - **Descriptions** - Transaction description analysis
+- **Commodities** - List commodities from the configured journal
 - **Tags** - Query and analyze transaction tags
 - **Notes** - List unique transaction notes and memo fields
 - **Files** - List data files used by hledger

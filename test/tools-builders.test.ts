@@ -10,6 +10,7 @@ import { IncomeStatementTool } from "../src/tools/incomestatement.js";
 import { CashFlowTool } from "../src/tools/cashflow.js";
 import { PayeesTool } from "../src/tools/payees.js";
 import { DescriptionsTool } from "../src/tools/descriptions.js";
+import { CommoditiesTool } from "../src/tools/commodities.js";
 import { TagsTool } from "../src/tools/tags.js";
 import { FilesTool } from "../src/tools/files.js";
 import { StatsTool } from "../src/tools/stats.js";
@@ -248,6 +249,23 @@ describe("Tool argument builders", () => {
     const cmd = result.metadata.command;
     expect(cmd).toContain("--sort amount");
     expect(cmd).toContain("openai");
+  });
+
+  it("builds the fixed commodities command with the configured journal", async () => {
+    const tool = new CommoditiesTool(journalPath);
+    const result = await tool.execute({});
+
+    expect(result.success).toBe(true);
+    expect(result.metadata.command).toContain("hledger commodities");
+    expect(result.metadata.command).toContain(`--file ${journalPath}`);
+  });
+
+  it("rejects commodities input fields", () => {
+    const tool = new CommoditiesTool(journalPath);
+
+    expect(tool.metadata.schema.safeParse({ query: "assets" }).success).toBe(
+      false,
+    );
   });
 
   it("builds tags command options", async () => {

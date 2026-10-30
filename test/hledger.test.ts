@@ -9,6 +9,7 @@ import { IncomeStatementTool } from "../src/tools/incomestatement.js";
 import { CashFlowTool } from "../src/tools/cashflow.js";
 import { PayeesTool } from "../src/tools/payees.js";
 import { DescriptionsTool } from "../src/tools/descriptions.js";
+import { CommoditiesTool } from "../src/tools/commodities.js";
 import { TagsTool } from "../src/tools/tags.js";
 import { FilesTool } from "../src/tools/files.js";
 import { StatsTool } from "../src/tools/stats.js";
@@ -27,6 +28,7 @@ describe("hledger MCP tools", () => {
   const cashFlowTool = new CashFlowTool(journalPath);
   const payeesTool = new PayeesTool(journalPath);
   const descriptionsTool = new DescriptionsTool(journalPath);
+  const commoditiesTool = new CommoditiesTool(journalPath);
   const tagsTool = new TagsTool(journalPath);
   const filesTool = new FilesTool(journalPath);
   const statsTool = new StatsTool(journalPath);
@@ -133,6 +135,12 @@ describe("hledger MCP tools", () => {
     const result = await descriptionsTool.execute({ outputFormat: "csv" });
     expect(result.success).toBe(true);
     expect(result.metadata.command).toContain("descriptions");
+  });
+
+  it("lists commodities with no input fields", async () => {
+    const result = await commoditiesTool.execute({});
+    expect(result.success).toBe(true);
+    expect(result.metadata.command).toContain("commodities");
   });
 
   it("lists tags", async () => {

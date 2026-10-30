@@ -78,6 +78,10 @@
       "description": "List transaction descriptions from the journal"
     },
     {
+      "name": "hledger_commodities",
+      "description": "List commodities from the configured journal"
+    },
+    {
       "name": "hledger_tags",
       "description": "List tag names used in transactions"
     },
