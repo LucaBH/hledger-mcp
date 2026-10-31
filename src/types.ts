@@ -1,5 +1,12 @@
 import { z } from "zod";
 
+function hasControlCharacters(value: string): boolean {
+  return Array.from(value).some((character) => {
+    const codePoint = character.codePointAt(0) ?? 0;
+    return codePoint <= 0x1f || codePoint === 0x7f;
+  });
+}
+
 // Date validation schema
 export const DateSchema = z
   .string()
@@ -39,7 +46,11 @@ export const FilePathSchema = z
   .min(1)
   .refine((path) => {
     // Basic path validation - no null bytes, no traversal attempts
-    return !path.includes("\0") && !path.includes("../") && path.length < 1000;
+    return (
+      !hasControlCharacters(path) &&
+      !path.includes("../") &&
+      path.length < 1000
+    );
   }, "Invalid file path");
 
 // Common hledger command options

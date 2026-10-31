@@ -37,6 +37,8 @@ const ALLOWED_COMMANDS = new Set([
 const ALLOWED_FLAGS = new Set([
   "file",
   "rules",
+  "rules-file",
+  "no-conf",
   "begin",
   "end",
   "period",
@@ -229,7 +231,10 @@ export class HLedgerExecutor {
 
         // Validate file paths for file-related flags
         if (
-          (flag === "file" || flag === "rules" || flag === "output-file") &&
+          (flag === "file" ||
+            flag === "rules" ||
+            flag === "rules-file" ||
+            flag === "output-file") &&
           arg.includes("=")
         ) {
           const filePath = arg.split("=", 2)[1];

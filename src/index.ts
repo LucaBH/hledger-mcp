@@ -21,6 +21,7 @@ import { ActivityTool } from "./tools/activity.js";
 import { NotesTool } from "./tools/notes.js";
 import { FindEntryTool } from "./tools/find-entry.js";
 import { AddTransactionTool } from "./tools/add.js";
+import { AddTransaction2Tool } from "./tools/add-transaction-2.js";
 import { ImportTransactionsTool } from "./tools/import.js";
 import { RewriteTransactionsTool } from "./tools/rewrite.js";
 import { RemoveEntryTool } from "./tools/remove-entry.js";
@@ -105,6 +106,9 @@ const webStopTool = new WebStopTool(journalFilePath);
 const addTransactionTool = new AddTransactionTool(journalFilePath, {
   readOnly: readOnlyMode,
   skipBackup,
+});
+const addTransaction2Tool = new AddTransaction2Tool(journalFilePath, {
+  readOnly: readOnlyMode,
 });
 const importTool = new ImportTransactionsTool(journalFilePath, {
   readOnly: readOnlyMode,
@@ -380,6 +384,18 @@ server.tool(
   addTransactionTool.metadata.schema.shape,
   async (args) => {
     const result = await addTransactionTool.execute(args);
+    return {
+      content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+    };
+  },
+);
+
+server.tool(
+  addTransaction2Tool.metadata.name,
+  addTransaction2Tool.metadata.description,
+  addTransaction2Tool.metadata.schema.shape,
+  async (args) => {
+    const result = await addTransaction2Tool.execute(args);
     return {
       content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
     };
