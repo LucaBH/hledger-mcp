@@ -182,7 +182,7 @@ The server communicates via stdio and expects the journal file path as the first
 When the server is not in `--read-only` mode, these tools can modify the primary journal:
 
 - `hledger_add_transaction` accepts structured postings and validates a temporary candidate with `hledger check`. A confirmed add appends one complete transaction record, syncs it, and does not create a backup or replace the journal. Enable `dryRun` to preview the entry without writing.
-- `hledger_add_transaction_2` accepts canonical decimal-dot quantities and unquoted commodity names. It creates one isolated CSV record and fixed rules for each call. A confirmed add validates with `hledger import --dry-run` before it runs `hledger import`.
+- `hledger_add_transaction_2` accepts canonical decimal-dot quantities, unquoted commodity names, and one optional transaction comment. It creates one isolated CSV record and fixed rules for each call. A confirmed add validates with `hledger import --dry-run` before it runs `hledger import`.
 - `hledger_remove_entry` deletes a transaction by exact text and location, re-validating with `hledger check` and respecting optional backups.
 - `hledger_replace_entry` swaps an existing entry for new content, keeping spacing tidy and performing a validation pass before committing.
 - `hledger_import` wraps `hledger import`, running the command against a temporary copy of the journal. Provide one or more `dataFiles` (journal, csv, etc.) and an optional `rulesFile`; set `dryRun` to inspect the diff before committing. Successful imports create timestamped `.bak` files unless `--skip-backup` is active.

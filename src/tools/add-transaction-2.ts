@@ -59,6 +59,7 @@ const AddTransaction2InputSchema = z.object({
   status: z.enum(["*", "!"]).optional(),
   code: textSchema(100).optional(),
   description: TextSchema,
+  comment: textSchema(500).optional(),
   postings: z.array(PostingSchema).min(2).max(MAX_POSTINGS),
   dryRun: z.boolean().optional(),
 }).strict();
@@ -77,7 +78,7 @@ function commodityLiteral(name: string): string {
 }
 
 function rulesFile(): string {
-  const fields = ["date", "status", "code", "description"];
+  const fields = ["date", "status", "code", "description", "comment"];
   const rules = ["decimal-mark ."];
 
   for (let index = 1; index <= MAX_POSTINGS; index += 1) {
@@ -209,7 +210,13 @@ export class AddTransaction2Tool extends BaseTool<typeof AddTransaction2InputSch
   }
 
   private csvRecord(input: z.infer<typeof AddTransaction2InputSchema>): string {
-    const values = [input.date, input.status ?? "", input.code ?? "", input.description];
+    const values = [
+      input.date,
+      input.status ?? "",
+      input.code ?? "",
+      input.description,
+      input.comment ?? "",
+    ];
     for (let index = 0; index < MAX_POSTINGS; index += 1) {
       const posting = input.postings[index];
       values.push(

@@ -78,6 +78,22 @@ describe("AddTransaction2Tool", () => {
     expect(journal).toContain("EUR 2,75");
   });
 
+  it("maps a transaction comment to an hledger transaction tag", async () => {
+    const result = await new AddTransaction2Tool(journalPath).execute({
+      date: "2026-02-15",
+      description: "Tagged cedar supplies",
+      comment: "project:orion",
+      postings: [
+        { account: "assets:cash", quantity: "-2.75", commodity: "EUR" },
+        { account: "expenses:office", quantity: "2.75", commodity: "EUR" },
+      ],
+    });
+
+    expect(result.success).toBe(true);
+    const tags = await HLedgerExecutor.execute("tags", ["--file", journalPath]);
+    expect(tags.stdout).toContain("project");
+  });
+
   it("uses the commodity display style with a conflicting target decimal mark", async () => {
     await fs.writeFile(journalPath, CONFLICTING_DECIMAL_JOURNAL, "utf8");
     const result = await new AddTransaction2Tool(journalPath).execute({
@@ -334,7 +350,7 @@ describe("AddTransaction2Tool", () => {
     ).rejects.toThrow("Invalid quantity");
   });
 
-  it("rejects caller-supplied rules and command fields", async () => {
+  it("rejects caller-supplied import and posting-extension fields", async () => {
     await expect(
       new AddTransaction2Tool(journalPath).execute({
         date: "2026-02-17",
@@ -345,8 +361,26 @@ describe("AddTransaction2Tool", () => {
         ],
         rulesFile: "/tmp/unsafe.rules",
         command: "import",
+        tags: ["project:orion"],
+        postingComments: ["unsafe"],
+        postingTags: ["unsafe:value"],
+        notes: ["unsafe"],
       }),
     ).rejects.toThrow("Unrecognized key(s)");
+  });
+
+  it("rejects a multi-line transaction comment", async () => {
+    await expect(
+      new AddTransaction2Tool(journalPath).execute({
+        date: "2026-02-17",
+        description: "Invalid comment",
+        comment: "project:orion\nunsafe",
+        postings: [
+          { account: "assets:cash", quantity: "-1", commodity: "EUR" },
+          { account: "expenses:office", quantity: "1", commodity: "EUR" },
+        ],
+      }),
+    ).rejects.toThrow("Text contains unsupported characters");
   });
 
   it("rejects a file value that contains a control character", async () => {
