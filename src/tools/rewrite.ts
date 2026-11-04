@@ -5,7 +5,7 @@ import { z } from "zod";
 import type { ToolMetadata } from "../base-tool.js";
 import { BaseTool } from "../base-tool.js";
 import { HLedgerExecutor } from "../executor.js";
-import { ReadBudget, ReadLimitError, readBoundedFile } from "../read-budget.js";
+import { ReadBudget, ReadLimitError, readBoundedFile, replaceBounded } from "../read-budget.js";
 import { FilePathSchema, ValidationError } from "../types.js";
 
 const PostingInstructionSchema = z.object({
@@ -103,7 +103,7 @@ export class RewriteTransactionsTool extends BaseTool<
       const rewriteResult = await HLedgerExecutor.execute("rewrite", args, { budget });
       const rawDiff = rewriteResult.stdout ?? "";
       const normalizedDiff = rawDiff
-        ? rawDiff.split(workspace.workspaceRoot).join(workspace.rootDir)
+        ? replaceBounded(rawDiff, workspace.workspaceRoot, workspace.rootDir)
         : rawDiff;
 
       if (dryRun) {

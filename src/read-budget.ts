@@ -30,6 +30,21 @@ export class ReadBudget {
   }
 }
 
+export function replaceBounded(text: string, search: string, replacement: string): string {
+  if (!search) throw new Error("Invalid replacement pattern.");
+  const budget = new ReadBudget();
+  budget.consume(Buffer.byteLength(text));
+  const growth = Math.max(0, Buffer.byteLength(replacement) - Buffer.byteLength(search));
+  if (growth > 0) {
+    let index = 0;
+    while ((index = text.indexOf(search, index)) !== -1) {
+      budget.consume(growth);
+      index += search.length;
+    }
+  }
+  return text.replaceAll(search, replacement);
+}
+
 export async function readBoundedFile(filePath: string, budget: ReadBudget): Promise<string> {
   const chunks: Buffer[] = [];
   try {

@@ -2,7 +2,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
-import { ReadBudget, ReadLimitError, readBoundedFile, configureReadLimit } from "../src/read-budget.js";
+import { ReadBudget, ReadLimitError, readBoundedFile, configureReadLimit, replaceBounded } from "../src/read-budget.js";
 
 test("counts combined chunks and accepts the exact byte limit", () => {
   const budget = new ReadBudget(4);
@@ -39,6 +39,12 @@ test("validates the startup byte limit", () => {
 test("does not expose a file path when a direct read fails", async () => {
   await expect(readBoundedFile("/synthetic-private-name/missing", new ReadBudget(4)))
     .rejects.toThrow("Failed to read journal data.");
+});
+
+test("bounds growth when formatting an output", () => {
+  expect(replaceBounded("aaaa", "a", "bb")).toBe("bbbbbbbb");
+  expect(() => replaceBounded("a", "a", "b".repeat(16 * 1024 * 1024 + 1)))
+    .toThrow(ReadLimitError);
 });
 
 test("rejects an invalid command-line limit before reading a journal", () => {
