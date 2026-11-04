@@ -32,6 +32,7 @@ import { WebListTool } from "./tools/web-list.js";
 import { WebStopTool } from "./tools/web-stop.js";
 import { registerJournalResources } from "./resource-loader.js";
 import { checkHledgerInstallation } from "./hledger-path.js";
+import { configureReadLimit } from "./read-budget.js";
 
 // Parse command line arguments and environment variables
 const cliArgs = process.argv.slice(2);
@@ -53,6 +54,13 @@ for (const arg of cliArgs) {
     readOnlyMode = true;
   } else if (arg === "--skip-backup") {
     skipBackup = true;
+  } else if (arg.startsWith("--read-limit=")) {
+    try {
+      configureReadLimit(arg.slice("--read-limit=".length));
+    } catch {
+      console.error("Error: Invalid read limit");
+      process.exit(1);
+    }
   } else if (!arg.startsWith("--") && !journalFilePath) {
     journalFilePath = arg;
   } else {

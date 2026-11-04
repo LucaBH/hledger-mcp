@@ -5,6 +5,7 @@ import { z } from "zod";
 import type { ToolMetadata } from "../base-tool.js";
 import { BaseTool } from "../base-tool.js";
 import { HLedgerExecutor } from "../executor.js";
+import { ReadBudget, ReadLimitError, readBoundedFile } from "../read-budget.js";
 import { FilePathSchema, ValidationError } from "../types.js";
 
 const PostingInstructionSchema = z.object({
@@ -91,13 +92,15 @@ export class RewriteTransactionsTool extends BaseTool<
       throw new ValidationError("No journal file specified");
     }
 
+    const budget = new ReadBudget();
     const workspace = await this.createRewriteWorkspace(
       path.resolve(targetFile),
+      budget,
     );
     const args = this.buildRewriteArgs(input, workspace);
 
     try {
-      const rewriteResult = await HLedgerExecutor.execute("rewrite", args);
+      const rewriteResult = await HLedgerExecutor.execute("rewrite", args, { budget });
       const rawDiff = rewriteResult.stdout ?? "";
       const normalizedDiff = rawDiff
         ? rawDiff.split(workspace.workspaceRoot).join(workspace.rootDir)
@@ -137,12 +140,12 @@ export class RewriteTransactionsTool extends BaseTool<
       }
 
       const patches = this.parseUnifiedDiff(rawDiff, workspace.workspaceRoot);
-      await this.applyPatchesToWorkspace(patches);
+      await this.applyPatchesToWorkspace(patches, budget);
 
       const checkResult = await HLedgerExecutor.execute("check", [
         "--file",
         workspace.targetCopy,
-      ]);
+      ], { budget });
 
       const changedFiles = new Set<string>();
       for (const patch of patches) {
@@ -239,6 +242,7 @@ export class RewriteTransactionsTool extends BaseTool<
 
   private async createRewriteWorkspace(
     targetOriginal: string,
+    budget: ReadBudget,
   ): Promise<RewriteWorkspace> {
     const originalReal = await fs.realpath(targetOriginal);
     const rootDir = path.dirname(originalReal);
@@ -250,14 +254,24 @@ export class RewriteTransactionsTool extends BaseTool<
     const copyToOriginal = new Map<string, string>();
     const visited = new Set<string>();
 
-    await this.copyWithIncludes(
-      originalReal,
-      rootDir,
-      workspaceRoot,
-      fileMap,
-      copyToOriginal,
-      visited,
-    );
+    try {
+      await this.copyWithIncludes(
+        originalReal,
+        rootDir,
+        workspaceRoot,
+        fileMap,
+        copyToOriginal,
+        visited,
+        budget,
+      );
+    } catch (error) {
+      try {
+        await fs.rm(workspaceRoot, { recursive: true, force: true });
+      } catch {
+        throw new Error("Failed to clean the preview workspace.");
+      }
+      throw error;
+    }
 
     const targetCopy = fileMap.get(originalReal);
     if (!targetCopy) {
@@ -281,6 +295,7 @@ export class RewriteTransactionsTool extends BaseTool<
     fileMap: Map<string, string>,
     copyToOriginal: Map<string, string>,
     visited: Set<string>,
+    budget: ReadBudget,
   ): Promise<void> {
     const resolved = await fs.realpath(filePath);
     if (visited.has(resolved)) {
@@ -300,7 +315,7 @@ export class RewriteTransactionsTool extends BaseTool<
     fileMap.set(resolved, destination);
     copyToOriginal.set(destination, resolved);
 
-    const content = await fs.readFile(destination, "utf8");
+    const content = await readBoundedFile(destination, budget);
     const includeRegex = /^\s*!include\s+(.+)$/gm;
     let match: RegExpExecArray | null;
     while ((match = includeRegex.exec(content)) !== null) {
@@ -314,6 +329,7 @@ export class RewriteTransactionsTool extends BaseTool<
       const includePaths = await this.expandIncludePaths(
         path.dirname(resolved),
         includeTarget,
+        budget,
       );
       for (const includePath of includePaths) {
         await this.copyWithIncludes(
@@ -323,6 +339,7 @@ export class RewriteTransactionsTool extends BaseTool<
           fileMap,
           copyToOriginal,
           visited,
+          budget,
         );
       }
     }
@@ -331,6 +348,7 @@ export class RewriteTransactionsTool extends BaseTool<
   private async expandIncludePaths(
     baseDir: string,
     pattern: string,
+    budget: ReadBudget,
   ): Promise<string[]> {
     const hasGlob = /[*?]/.test(pattern);
     if (!hasGlob) {
@@ -341,16 +359,25 @@ export class RewriteTransactionsTool extends BaseTool<
     const absolutePattern = path.resolve(baseDir, pattern);
     const dir = path.dirname(absolutePattern);
     const regex = this.globToRegExp(path.basename(absolutePattern));
-    let entries;
+    let directory;
     try {
-      entries = await fs.readdir(dir, { withFileTypes: true });
+      directory = await fs.opendir(dir);
     } catch {
       return [];
     }
-    const matches = entries
-      .filter((entry) => entry.isFile() && regex.test(entry.name))
-      .map((entry) => path.join(dir, entry.name));
-    return Promise.all(matches.map((matchPath) => fs.realpath(matchPath)));
+    const matches: string[] = [];
+    try {
+      for await (const entry of directory) {
+        budget.consume(Buffer.byteLength(entry.name) + 1);
+        if (entry.isFile() && regex.test(entry.name)) {
+          matches.push(await fs.realpath(path.join(dir, entry.name)));
+        }
+      }
+    } catch (error) {
+      if (error instanceof ReadLimitError) throw error;
+      throw new Error("Failed to read included journal data.");
+    }
+    return matches;
   }
 
   private globToRegExp(pattern: string): RegExp {
@@ -418,9 +445,9 @@ export class RewriteTransactionsTool extends BaseTool<
     return patches;
   }
 
-  private async applyPatchesToWorkspace(patches: FilePatch[]): Promise<void> {
+  private async applyPatchesToWorkspace(patches: FilePatch[], budget: ReadBudget): Promise<void> {
     for (const patch of patches) {
-      const originalContent = await fs.readFile(patch.filePath, "utf8");
+      const originalContent = await readBoundedFile(patch.filePath, budget);
       const hasTrailingNewline = originalContent.endsWith("\n");
       let lines = hasTrailingNewline
         ? originalContent.slice(0, -1).split("\n")

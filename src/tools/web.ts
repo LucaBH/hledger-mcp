@@ -1,5 +1,7 @@
 import { spawn } from "node:child_process";
 import { createServer } from "node:net";
+import { StringDecoder } from "node:string_decoder";
+import { ReadBudget, ReadLimitError } from "../read-budget.js";
 import { z } from "zod";
 import type { ToolMetadata } from "../base-tool.js";
 import { BaseTool } from "../base-tool.js";
@@ -116,12 +118,13 @@ export class WebTool extends BaseTool<typeof WebInputSchema> {
       stdio: ["ignore", "pipe", "pipe"],
     });
 
-    child.stdout.setEncoding("utf8");
-    child.stderr.setEncoding("utf8");
-
     return await new Promise<CommandResult>((resolve, reject) => {
       let stdoutBuffer = "";
       let stderrBuffer = "";
+      // A write-capable server may already be serving requests during startup.
+      const budget = effectiveAllow === "view" ? new ReadBudget() : undefined;
+      const stdoutDecoder = new StringDecoder("utf8");
+      const stderrDecoder = new StringDecoder("utf8");
       let settled = false;
       let readyReason: WebReadySignal = "timeout";
 
@@ -200,16 +203,36 @@ export class WebTool extends BaseTool<typeof WebInputSchema> {
         );
       };
 
-      const onStdout = (chunk: string) => {
-        stdoutBuffer += chunk;
+      const onOverflow = () => {
+        settled = true;
+        stdoutBuffer = "";
+        stderrBuffer = "";
+        cleanup();
+        child.once("error", () => {});
+        child.once("close", () => reject(new ReadLimitError()));
+        child.stdout.resume();
+        child.stderr.resume();
+        child.kill("SIGKILL");
+      };
+
+      const onStdout = (chunk: Buffer) => {
+        try { budget?.consume(chunk.length); } catch {
+          onOverflow();
+          return;
+        }
+        stdoutBuffer += stdoutDecoder.write(chunk);
         if (!settled && READY_REGEX.test(stdoutBuffer)) {
           readyReason = "log";
           resolveSuccess();
         }
       };
 
-      const onStderr = (chunk: string) => {
-        stderrBuffer += chunk;
+      const onStderr = (chunk: Buffer) => {
+        try { budget?.consume(chunk.length); } catch {
+          onOverflow();
+          return;
+        }
+        stderrBuffer += stderrDecoder.write(chunk);
       };
 
       const onError = (error: Error) => {

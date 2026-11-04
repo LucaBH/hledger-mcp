@@ -7,8 +7,8 @@ import { HLedgerExecutor } from "../src/executor.js";
 
 // This test creates only fictional journal data. It does not read repository fixtures.
 const SYNTHETIC_JOURNAL = `2026-01-01 Opening balance
-  assets:cash  20.00 EUR
-  equity:opening  -20.00 EUR
+  assets:cash  20.00 SYN
+  equity:opening  -20.00 SYN
 `;
 
 const WORKER_SOURCE = `
@@ -21,8 +21,8 @@ const result = await new AddTransactionTool().execute({
   date,
   description,
   postings: [
-    { account: "assets:cash", amount: "-4.00 EUR" },
-    { account: "expenses:travel", amount: "4.00 EUR" },
+    { account: "assets:cash", amount: "-4.00 SYN" },
+    { account: "expenses:travel", amount: "4.00 SYN" },
   ],
 });
 
@@ -86,8 +86,8 @@ describe("AddTransactionTool synthetic contract", () => {
       date: "2026-02-14",
       description: "Northstar Stationery",
       postings: [
-        { account: "assets:cash", amount: "-5.00 EUR" },
-        { account: "expenses:office", amount: "5.00 EUR" },
+        { account: "assets:cash", amount: "-5.00 SYN" },
+        { account: "expenses:office", amount: "5.00 SYN" },
       ],
     });
 
@@ -120,8 +120,8 @@ describe("AddTransactionTool synthetic contract", () => {
       description: "Aurora Paper Studio",
       dryRun: true,
       postings: [
-        { account: "assets:cash", amount: "-2.00 EUR" },
-        { account: "expenses:office", amount: "2.00 EUR" },
+        { account: "assets:cash", amount: "-2.00 SYN" },
+        { account: "expenses:office", amount: "2.00 SYN" },
       ],
     });
 
@@ -138,8 +138,8 @@ describe("AddTransactionTool synthetic contract", () => {
       date: "2026-03-01",
       description: "Cedar Library Supplies",
       postings: [
-        { account: "assets:cash", amount: "-3.00 EUR" },
-        { account: "expenses:books", amount: "3.00 EUR" },
+        { account: "assets:cash", amount: "-3.00 SYN" },
+        { account: "expenses:books", amount: "3.00 SYN" },
       ],
     });
 

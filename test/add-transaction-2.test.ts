@@ -6,19 +6,19 @@ import { AddTransaction2Tool } from "../src/tools/add-transaction-2.js";
 import { HLedgerExecutor } from "../src/executor.js";
 import { HLedgerError } from "../src/types.js";
 
-const SYNTHETIC_JOURNAL = `commodity EUR 1.000,00
+const SYNTHETIC_JOURNAL = `commodity SYN 1.000,00
 
 2026-01-01 Opening balance
-  assets:cash  20,00 EUR
-  equity:opening  -20,00 EUR
+  assets:cash  20,00 SYN
+  equity:opening  -20,00 SYN
 `;
 
 const CONFLICTING_DECIMAL_JOURNAL = `decimal-mark .
-commodity EUR 1.000,00
+commodity SYN 1.000,00
 
 2026-01-01 Opening balance
-  assets:cash  EUR 20.00
-  equity:opening  EUR -20.00
+  assets:cash  SYN 20.00
+  equity:opening  SYN -20.00
 `;
 
 describe("AddTransaction2Tool", () => {
@@ -42,8 +42,8 @@ describe("AddTransaction2Tool", () => {
       description: "Aurora stationery",
       dryRun: true,
       postings: [
-        { account: "assets:cash", quantity: "-1.50", commodity: "EUR" },
-        { account: "expenses:office", quantity: "1.50", commodity: "EUR" },
+        { account: "assets:cash", quantity: "-1.50", commodity: "SYN" },
+        { account: "expenses:office", quantity: "1.50", commodity: "SYN" },
       ],
     });
 
@@ -55,7 +55,7 @@ describe("AddTransaction2Tool", () => {
     expect(await fs.readFile(journalPath, "utf8")).toBe(original);
     const preview = JSON.parse(result.data) as { transaction: string };
     expect(preview.transaction).toContain("Aurora stationery");
-    expect(preview.transaction).toContain("EUR 1,50");
+    expect(preview.transaction).toContain("SYN 1,50");
   });
 
   it("appends a formatted transaction through hledger import", async () => {
@@ -63,8 +63,8 @@ describe("AddTransaction2Tool", () => {
       date: "2026-02-15",
       description: "Cedar supplies",
       postings: [
-        { account: "assets:cash", quantity: "-2.75", commodity: "EUR" },
-        { account: "expenses:office", quantity: "2.75", commodity: "EUR" },
+        { account: "assets:cash", quantity: "-2.75", commodity: "SYN" },
+        { account: "expenses:office", quantity: "2.75", commodity: "SYN" },
       ],
     });
 
@@ -75,7 +75,7 @@ describe("AddTransaction2Tool", () => {
     expect(result.metadata.command).toBe("hledger import");
     const journal = await fs.readFile(journalPath, "utf8");
     expect(journal).toContain("2026-02-15 Cedar supplies");
-    expect(journal).toContain("EUR 2,75");
+    expect(journal).toContain("SYN 2,75");
   });
 
   it("maps a transaction comment to an hledger transaction tag", async () => {
@@ -84,8 +84,8 @@ describe("AddTransaction2Tool", () => {
       description: "Tagged cedar supplies",
       comment: "project:orion",
       postings: [
-        { account: "assets:cash", quantity: "-2.75", commodity: "EUR" },
-        { account: "expenses:office", quantity: "2.75", commodity: "EUR" },
+        { account: "assets:cash", quantity: "-2.75", commodity: "SYN" },
+        { account: "expenses:office", quantity: "2.75", commodity: "SYN" },
       ],
     });
 
@@ -101,8 +101,8 @@ describe("AddTransaction2Tool", () => {
       description: "Conflicting decimal mark",
       dryRun: true,
       postings: [
-        { account: "assets:cash", quantity: "-2.75", commodity: "EUR" },
-        { account: "expenses:office", quantity: "2.75", commodity: "EUR" },
+        { account: "assets:cash", quantity: "-2.75", commodity: "SYN" },
+        { account: "expenses:office", quantity: "2.75", commodity: "SYN" },
       ],
     });
 
@@ -111,7 +111,7 @@ describe("AddTransaction2Tool", () => {
       throw new Error("The dry run did not succeed");
     }
     const preview = JSON.parse(result.data) as { transaction: string };
-    expect(preview.transaction).toContain("EUR 2,75");
+    expect(preview.transaction).toContain("SYN 2,75");
   });
 
   it("encodes a commodity name as a journal literal before CSV serialization", async () => {
@@ -193,8 +193,8 @@ describe("AddTransaction2Tool", () => {
       description: "Fictional exchange",
       dryRun: true,
       postings: [
-        { account: "assets:cash", quantity: "-1.25", commodity: "EUR" },
-        { account: "equity:conversion", quantity: "1.25", commodity: "EUR" },
+        { account: "assets:cash", quantity: "-1.25", commodity: "SYN" },
+        { account: "equity:conversion", quantity: "1.25", commodity: "SYN" },
         { account: "equity:conversion", quantity: "-3", commodity: "gold" },
         { account: "assets:stock", quantity: "3", commodity: "gold" },
       ],
@@ -205,7 +205,7 @@ describe("AddTransaction2Tool", () => {
       throw new Error("The dry run did not succeed");
     }
     const preview = JSON.parse(result.data) as { transaction: string };
-    expect(preview.transaction).toContain("EUR 1,25");
+    expect(preview.transaction).toContain("SYN 1,25");
     expect(preview.transaction).toContain("3 gold");
   });
 
@@ -215,8 +215,8 @@ describe("AddTransaction2Tool", () => {
       date: "2026-02-17",
       description: "Unbalanced synthetic transaction",
       postings: [
-        { account: "assets:cash", quantity: "-1", commodity: "EUR" },
-        { account: "expenses:office", quantity: "2", commodity: "EUR" },
+        { account: "assets:cash", quantity: "-1", commodity: "SYN" },
+        { account: "expenses:office", quantity: "2", commodity: "SYN" },
       ],
     });
 
@@ -236,8 +236,8 @@ describe("AddTransaction2Tool", () => {
       date: "2026-02-17",
       description: "Temporary workspace cleanup",
       postings: [
-        { account: "assets:cash", quantity: "-1", commodity: "EUR" },
-        { account: "expenses:office", quantity: "1", commodity: "EUR" },
+        { account: "assets:cash", quantity: "-1", commodity: "SYN" },
+        { account: "expenses:office", quantity: "1", commodity: "SYN" },
       ],
     });
 
@@ -258,8 +258,8 @@ describe("AddTransaction2Tool", () => {
       date: "2026-02-18",
       description: "CSV write failure",
       postings: [
-        { account: "assets:cash", quantity: "-1", commodity: "EUR" },
-        { account: "expenses:office", quantity: "1", commodity: "EUR" },
+        { account: "assets:cash", quantity: "-1", commodity: "SYN" },
+        { account: "expenses:office", quantity: "1", commodity: "SYN" },
       ],
     });
 
@@ -274,16 +274,16 @@ describe("AddTransaction2Tool", () => {
       date: "2026-02-19",
       description: "Orion map shop",
       postings: [
-        { account: "assets:cash", quantity: "-1", commodity: "EUR" },
-        { account: "expenses:office", quantity: "1", commodity: "EUR" },
+        { account: "assets:cash", quantity: "-1", commodity: "SYN" },
+        { account: "expenses:office", quantity: "1", commodity: "SYN" },
       ],
     });
     const second = new AddTransaction2Tool(journalPath).execute({
       date: "2026-02-20",
       description: "Lumen print house",
       postings: [
-        { account: "assets:cash", quantity: "-2", commodity: "EUR" },
-        { account: "expenses:office", quantity: "2", commodity: "EUR" },
+        { account: "assets:cash", quantity: "-2", commodity: "SYN" },
+        { account: "expenses:office", quantity: "2", commodity: "SYN" },
       ],
     });
 
@@ -314,8 +314,8 @@ describe("AddTransaction2Tool", () => {
       date: "2026-02-21",
       description: "Ambiguous synthetic outcome",
       postings: [
-        { account: "assets:cash", quantity: "-1", commodity: "EUR" },
-        { account: "expenses:office", quantity: "1", commodity: "EUR" },
+        { account: "assets:cash", quantity: "-1", commodity: "SYN" },
+        { account: "expenses:office", quantity: "1", commodity: "SYN" },
       ],
     });
 
@@ -332,8 +332,8 @@ describe("AddTransaction2Tool", () => {
         date: "2026-02-17",
         description: "Invalid quantity",
         postings: [
-          { account: "assets:cash", quantity: "1,50", commodity: "EUR" },
-          { account: "expenses:office", quantity: "-1.50", commodity: "EUR" },
+          { account: "assets:cash", quantity: "1,50", commodity: "SYN" },
+          { account: "expenses:office", quantity: "-1.50", commodity: "SYN" },
         ],
       }),
     ).rejects.toThrow("Invalid quantity");
@@ -343,8 +343,8 @@ describe("AddTransaction2Tool", () => {
         date: "2026-02-17",
         description: "Grouped quantity",
         postings: [
-          { account: "assets:cash", quantity: "-1,000.00", commodity: "EUR" },
-          { account: "expenses:office", quantity: "1000.00", commodity: "EUR" },
+          { account: "assets:cash", quantity: "-1,000.00", commodity: "SYN" },
+          { account: "expenses:office", quantity: "1000.00", commodity: "SYN" },
         ],
       }),
     ).rejects.toThrow("Invalid quantity");
@@ -356,8 +356,8 @@ describe("AddTransaction2Tool", () => {
         date: "2026-02-17",
         description: "Unsupported fields",
         postings: [
-          { account: "assets:cash", quantity: "-1", commodity: "EUR" },
-          { account: "expenses:office", quantity: "1", commodity: "EUR" },
+          { account: "assets:cash", quantity: "-1", commodity: "SYN" },
+          { account: "expenses:office", quantity: "1", commodity: "SYN" },
         ],
         rulesFile: "/tmp/unsafe.rules",
         command: "import",
@@ -366,7 +366,7 @@ describe("AddTransaction2Tool", () => {
         postingTags: ["unsafe:value"],
         notes: ["unsafe"],
       }),
-    ).rejects.toThrow("Unrecognized key(s)");
+    ).rejects.toThrow("Unrecognized keys");
   });
 
   it("rejects a multi-line transaction comment", async () => {
@@ -376,8 +376,8 @@ describe("AddTransaction2Tool", () => {
         description: "Invalid comment",
         comment: "project:orion\nunsafe",
         postings: [
-          { account: "assets:cash", quantity: "-1", commodity: "EUR" },
-          { account: "expenses:office", quantity: "1", commodity: "EUR" },
+          { account: "assets:cash", quantity: "-1", commodity: "SYN" },
+          { account: "expenses:office", quantity: "1", commodity: "SYN" },
         ],
       }),
     ).rejects.toThrow("Text contains unsupported characters");
@@ -390,8 +390,8 @@ describe("AddTransaction2Tool", () => {
         date: "2026-02-17",
         description: "Invalid file value",
         postings: [
-          { account: "assets:cash", quantity: "-1", commodity: "EUR" },
-          { account: "expenses:office", quantity: "1", commodity: "EUR" },
+          { account: "assets:cash", quantity: "-1", commodity: "SYN" },
+          { account: "expenses:office", quantity: "1", commodity: "SYN" },
         ],
       }),
     ).rejects.toThrow("Invalid file path");
@@ -403,8 +403,8 @@ describe("AddTransaction2Tool", () => {
       date: "2026-02-18",
       description: "Blocked write",
       postings: [
-        { account: "assets:cash", quantity: "-1", commodity: "EUR" },
-        { account: "expenses:office", quantity: "1", commodity: "EUR" },
+        { account: "assets:cash", quantity: "-1", commodity: "SYN" },
+        { account: "expenses:office", quantity: "1", commodity: "SYN" },
       ],
     });
 

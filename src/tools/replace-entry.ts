@@ -4,6 +4,7 @@ import { z } from "zod";
 import type { ToolMetadata } from "../base-tool.js";
 import { BaseTool } from "../base-tool.js";
 import { HLedgerExecutor } from "../executor.js";
+import { ReadBudget, readBoundedFile } from "../read-budget.js";
 import {
   createJournalWorkspace,
   cleanupJournalWorkspace,
@@ -69,9 +70,10 @@ export class ReplaceEntryTool extends BaseTool<typeof ReplaceEntryInputSchema> {
     const resolvedPath = await this.resolveTargetFile(file);
 
     const workspace = await createJournalWorkspace(resolvedPath);
+    const budget = new ReadBudget();
 
     try {
-      const content = await fs.readFile(workspace.tempPath, "utf8");
+      const content = await readBoundedFile(workspace.tempPath, budget);
       const editor = new JournalFileEditor(content);
 
       const existingEntry = normalizeEntryForComparison(
@@ -96,7 +98,7 @@ export class ReplaceEntryTool extends BaseTool<typeof ReplaceEntryInputSchema> {
       const checkResult = await HLedgerExecutor.execute("check", [
         "--file",
         workspace.tempPath,
-      ]);
+      ], { budget });
 
       if (dryRun) {
         await cleanupJournalWorkspace(workspace);

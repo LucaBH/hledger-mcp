@@ -120,8 +120,9 @@ You can toggle write behaviour with optional flags:
 
 - `--read-only` &mdash; disables the add-transaction tool entirely; all write attempts return an error.
 - `--skip-backup` &mdash; prevents backups for write tools that use a copy-and-replace workflow. The add-transaction tool does not create backups.
+- `--read-limit=BYTES` &mdash; sets the per-operation read and preview limit in bytes. The default and minimum are 16777216 bytes (16 MiB). The maximum is 268435456 bytes (256 MiB). Invalid values stop startup. Final writes do not use this limit.
 
-Flags may appear before or after the journal path. Both options default to `false`. I recommend starting with `--read-only` enabled until you get more comfortable with the tool. Below is that sample config:
+Flags may appear before or after the journal path. The Boolean options default to `false`. I recommend starting with `--read-only` enabled until you get more comfortable with the tool. Below is that sample config:
 
 ```json
 {

@@ -137,7 +137,7 @@ describe("FindEntryTool (unit)", () => {
       "--output-format",
       "json",
       "--location",
-    ]);
+    ], { budget: expect.anything() });
 
     const payload = JSON.parse(response.data) as {
       total: number;

@@ -171,7 +171,7 @@ export class AddTransaction2Tool extends BaseTool<typeof AddTransaction2InputSch
         let result;
         try {
           finalWriteAttempted = true;
-          result = await HLedgerExecutor.execute("import", args);
+          result = await HLedgerExecutor.execute("import", args, { finalWrite: true });
         } catch {
           throw new AmbiguousFinalWriteError();
         }

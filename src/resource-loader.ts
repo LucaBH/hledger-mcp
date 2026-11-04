@@ -1,5 +1,5 @@
 import path from "node:path";
-import { readFile as readFileFs } from "node:fs/promises";
+import { ReadBudget, ReadLimitError, readBoundedFile } from "./read-budget.js";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { HLedgerExecutor } from "./executor.js";
@@ -26,7 +26,7 @@ const defaultListFiles = async (journalFile: string): Promise<string[]> => {
 };
 
 const defaultReadFile = async (filePath: string): Promise<string> => {
-  return await readFileFs(filePath, "utf8");
+  return await readBoundedFile(filePath, new ReadBudget());
 };
 
 export async function registerJournalResources(
@@ -53,10 +53,8 @@ export async function registerJournalResources(
       discoveredPaths.add(path.normalize(absolutePath));
     }
   } catch (error) {
-    logger.error?.(
-      "Failed to discover included journal files via hledger",
-      error,
-    );
+    if (error instanceof ReadLimitError) throw error;
+    logger.error?.("Failed to discover included journal files via hledger");
   }
 
   const usedNames = new Set<string>();
@@ -99,11 +97,9 @@ export async function registerJournalResources(
             ],
           };
         } catch (readError) {
-          logger.error?.(
-            `Failed to read journal resource ${resourceUri.href}`,
-            readError,
-          );
-          throw readError;
+          logger.error?.("Failed to read journal resource");
+          if (readError instanceof ReadLimitError) throw readError;
+          throw new Error("Failed to read journal resource");
         }
       },
     );

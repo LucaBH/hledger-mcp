@@ -139,7 +139,6 @@ describe("registerJournalResources", () => {
     expect(listFiles).toHaveBeenCalledWith(rootJournal);
     expect(logger.error).toHaveBeenCalledWith(
       "Failed to discover included journal files via hledger",
-      discoveryError,
     );
     expect(registerResource).toHaveBeenCalledTimes(1);
 

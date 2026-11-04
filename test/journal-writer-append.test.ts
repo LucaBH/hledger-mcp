@@ -10,13 +10,13 @@ import {
 
 // This test creates only fictional journal data. It does not read repository fixtures.
 const SYNTHETIC_JOURNAL = `2026-01-01 Opening balance
-  assets:cash  20.00 EUR
-  equity:opening  -20.00 EUR
+  assets:cash  20.00 SYN
+  equity:opening  -20.00 SYN
 `;
 
 const SYNTHETIC_TRANSACTION = `2026-04-01 Atlas Art Store
-  assets:cash  -7.00 EUR
-  expenses:office  7.00 EUR`;
+  assets:cash  -7.00 SYN
+  expenses:office  7.00 SYN`;
 
 describe("appendTransactionWithAppendOnlyFinalWrite failures", () => {
   let tempDir: string;

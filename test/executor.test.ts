@@ -19,6 +19,7 @@ describe("HLedgerExecutor", () => {
     stderr?: string;
     exitCode?: number | null;
     error?: Error;
+    streamError?: boolean;
     autoClose?: boolean;
     killExitCode?: number | null;
   }) => {
@@ -26,11 +27,13 @@ describe("HLedgerExecutor", () => {
       const eventHandlers: Record<string, Array<(arg?: unknown) => void>> = {};
       const stdoutHandlers: Array<(chunk: Buffer) => void> = [];
       const stderrHandlers: Array<(chunk: Buffer) => void> = [];
+      const stdoutErrors: Array<() => void> = [];
 
       const child = {
         stdout: {
           on: jest.fn((event: string, handler: (chunk: Buffer) => void) => {
             if (event === "data") stdoutHandlers.push(handler);
+            if (event === "error") stdoutErrors.push(handler as () => void);
             return child.stdout;
           }),
         },
@@ -56,6 +59,12 @@ describe("HLedgerExecutor", () => {
       process.nextTick(() => {
         if (options.error) {
           eventHandlers["error"]?.forEach((handler) => handler(options.error));
+          eventHandlers["close"]?.forEach((handler) => handler(null));
+          return;
+        }
+
+        if (options.streamError) {
+          stdoutErrors.forEach((handler) => handler());
           return;
         }
 
@@ -178,7 +187,13 @@ describe("HLedgerExecutor", () => {
     setupSpawnMock({ error: new Error("spawn failed") });
     const Executor = await loadExecutor();
 
-    await expect(Executor.execute("print", [])).rejects.toThrow(/spawn failed/);
+    await expect(Executor.execute("print", [])).rejects.toThrow("The hledger process failed.");
+  });
+
+  it("stops the child and returns a safe error when a stream fails", async () => {
+    setupSpawnMock({ streamError: true });
+    const Executor = await loadExecutor();
+    await expect(Executor.execute("print", [])).rejects.toThrow("The hledger process failed.");
   });
 
   it("throws TimeoutError when aborted", async () => {

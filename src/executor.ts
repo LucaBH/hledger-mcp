@@ -1,7 +1,9 @@
 import { spawn } from "child_process";
+import { StringDecoder } from "node:string_decoder";
 import type { CommandResult } from "./types.js";
 import { HLedgerError, TimeoutError } from "./types.js";
 import { getHledgerPath } from "./hledger-path.js";
+import { ReadBudget, ReadLimitError } from "./read-budget.js";
 
 // Allowlist of supported hledger commands
 const ALLOWED_COMMANDS = new Set([
@@ -131,6 +133,8 @@ const ALLOWED_FLAGS = new Set([
 export interface ExecuteOptions {
   timeout?: number; // milliseconds, default 30000 (30 seconds)
   signal?: AbortSignal;
+  budget?: ReadBudget;
+  finalWrite?: boolean;
 }
 
 export class HLedgerExecutor {
@@ -161,7 +165,7 @@ export class HLedgerExecutor {
       : timeoutController.signal;
 
     try {
-      const result = await this.spawnCommand(command, sanitizedArgs, signal);
+      const result = await this.spawnCommand(command, sanitizedArgs, signal, options.finalWrite ? undefined : (options.budget ?? new ReadBudget()));
       const duration = Date.now() - startTime;
 
       clearTimeout(timeoutId);
@@ -176,7 +180,7 @@ export class HLedgerExecutor {
 
       if (signal.aborted) {
         throw new TimeoutError(
-          `Command timed out after ${timeout}ms: ${fullCommand}`,
+          `Command timed out after ${timeout}ms`,
         );
       }
 
@@ -348,6 +352,7 @@ export class HLedgerExecutor {
     command: string,
     args: string[],
     signal: AbortSignal,
+    budget?: ReadBudget,
   ): Promise<Omit<CommandResult, "command" | "duration">> {
     return new Promise((resolve, reject) => {
       const hledgerPath = getHledgerPath();
@@ -358,27 +363,54 @@ export class HLedgerExecutor {
 
       let stdout = "";
       let stderr = "";
+      let overflow = false;
+      let processError = false;
+      const stdoutDecoder = new StringDecoder("utf8");
+      const stderrDecoder = new StringDecoder("utf8");
 
       child.stdout.on("data", (data) => {
-        stdout += data.toString();
+        if (overflow) return;
+        try { budget?.consume(data.length); } catch {
+          overflow = true;
+          stdout = "";
+          stderr = "";
+          child.kill("SIGKILL");
+          return;
+        }
+        stdout += stdoutDecoder.write(data);
       });
 
       child.stderr.on("data", (data) => {
-        stderr += data.toString();
+        if (overflow) return;
+        try { budget?.consume(data.length); } catch {
+          overflow = true;
+          stdout = "";
+          stderr = "";
+          child.kill("SIGKILL");
+          return;
+        }
+        stderr += stderrDecoder.write(data);
       });
 
-      child.on("error", (error) => {
-        reject(
-          new HLedgerError(
-            `Failed to spawn hledger: ${error.message}`,
-            1,
-            error.message,
-            `${hledgerPath} ${command}`,
-          ),
-        );
-      });
+      child.on("error", () => { processError = true; });
+      const onStreamError = () => {
+        processError = true;
+        child.kill("SIGKILL");
+      };
+      child.stdout.on("error", onStreamError);
+      child.stderr.on("error", onStreamError);
 
       child.on("close", (code) => {
+        if (overflow) {
+          reject(new ReadLimitError());
+          return;
+        }
+        if (processError) {
+          reject(new HLedgerError("The hledger process failed.", 1, "", "hledger"));
+          return;
+        }
+        stdout += stdoutDecoder.end();
+        stderr += stderrDecoder.end();
         const exitCode = code ?? 1;
         const success = exitCode === 0;
 
@@ -401,9 +433,6 @@ export class HLedgerExecutor {
         }
       });
 
-      signal.addEventListener("abort", () => {
-        child.kill("SIGTERM");
-      });
     });
   }
 

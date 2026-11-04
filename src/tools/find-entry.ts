@@ -6,6 +6,7 @@ import { BaseTool } from "../base-tool.js";
 import { HLedgerExecutor } from "../executor.js";
 import { FilePathSchema, ValidationError } from "../types.js";
 import { JournalFileEditor } from "../utils/journal-file.js";
+import { ReadBudget, readBoundedFile } from "../read-budget.js";
 
 const FindEntryInputSchema = z.object({
   file: FilePathSchema.optional(),
@@ -71,7 +72,8 @@ export class FindEntryTool extends BaseTool<typeof FindEntryInputSchema> {
       args.push(...this.parseQuery(input.query));
     }
 
-    const result = await HLedgerExecutor.execute("print", args);
+    const budget = new ReadBudget();
+    const result = await HLedgerExecutor.execute("print", args, { budget });
 
     let parsed: RawPrintEntry[] = [];
     if (result.stdout.trim()) {
@@ -92,6 +94,8 @@ export class FindEntryTool extends BaseTool<typeof FindEntryInputSchema> {
     const files = new Map<string, string>();
 
     const entries: FindEntryResultEntry[] = [];
+    const resultBudget = new ReadBudget();
+    resultBudget.consume(Buffer.byteLength('{"total":200,"entries":[]}'));
 
     for (const entry of parsed) {
       if (!entry.tsourcepos || entry.tsourcepos.length === 0) {
@@ -121,7 +125,7 @@ export class FindEntryTool extends BaseTool<typeof FindEntryInputSchema> {
 
       let editor = editors.get(resolvedSource);
       if (!editor) {
-        const content = await fs.readFile(resolvedSource, "utf8");
+        const content = await readBoundedFile(resolvedSource, budget);
         editor = new JournalFileEditor(content);
         editors.set(resolvedSource, editor);
       }
@@ -133,7 +137,7 @@ export class FindEntryTool extends BaseTool<typeof FindEntryInputSchema> {
 
       const entryText = editor.extract(startLine, endLine);
 
-      entries.push({
+      const resultEntry: FindEntryResultEntry = {
         date: entry.tdate,
         status: entry.tstatus,
         description: entry.tdescription,
@@ -148,7 +152,9 @@ export class FindEntryTool extends BaseTool<typeof FindEntryInputSchema> {
           startLine,
           endLine,
         },
-      });
+      };
+      resultBudget.consume(Buffer.byteLength(JSON.stringify(resultEntry)) + 1);
+      entries.push(resultEntry);
     }
 
     const payload = {
